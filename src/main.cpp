@@ -22,10 +22,179 @@
 #include <Adafruit_PWMServoDriver.h>
 #endif
 
+// Command index (matches command_table index)
+#define SERIAL_LOOP_BACK 0
+#define SET_PIN_MODE 1
+#define DIGITAL_WRITE 2
+#define DIGITAL_READ 3
+#define ANALOG_WRITE 4
+#define ANALOG_READ 5
 
+#define I2C_WRITE 6
+#define I2C_READ 7
+#define SPI_WRITE 8
+#define SPI_READ 9
+
+#define DC_WRITE 10
+#define DC_READ 11
+#define SERVO_WRITE 12
+#define SERVO_READ 13
+
+#define BUZZER_WRITE 14
+#define PWM_WRITE 15
+
+extern void serial_loopback();
+
+// 2 bytes: 0: pin, 1: mode
+extern void set_pin_mode();
+
+// 2 bytes: 0: pin, 1: value
+extern void digital_write();
+
+// 1 byte: 0: pin
+extern void digital_read();
+
+// 2 bytes: 0: pin, 1: value (0-255)
+extern void analog_write();
+
+// 1 byte: 0: pin
+extern void analog_read();
+
+
+struct command_descriptor {
+    void (*command_func)();
+};
+
+command_descriptor command_table[] = {
+    { &serial_loopback },       // 0
+    { &set_pin_mode },          // 1...
+    { &digital_write },
+    { &digital_read },
+    { &analog_write },
+    { &analog_read },
+};
+
+#define MAX_COMMAND_LENGTH 30
+#define DEBUG_PRINT 99
+
+#define MAX_DIGITAL_PINS_SUPPORTED 100
+#define MAX_ANALOG_PINS_SUPPORTED 16
+
+struct pin_descriptor {
+    byte pin_number;
+    byte pin_mode;
+    bool reporting_enabled;  // If true, then send reports if an input pin
+    int last_value;          // Last value read for input mode
+};
+
+pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
+
+byte command_buffer[MAX_COMMAND_LENGTH];
+
+void get_next_command() {
+    byte command;
+    byte packet_length;
+    command_descriptor command_entry;
+
+    // clear the command buffer
+    memset(command_buffer, 0, sizeof(command_buffer));
+
+    // if there is no command waiting, then return
+    if (!Serial.available()) {
+        return;
+    }
+    // get the packet length
+    packet_length = (byte)Serial.read();
+
+    while (!Serial.available()) {
+        delay(1);
+    }
+
+    // get the command byte
+    command = (byte)Serial.read();
+
+    // uncomment the next line to see the packet length and command
+    //send_debug_info(packet_length, command);
+    command_entry = command_table[command];
+
+    if (packet_length > 1) {
+        // get the data for that command
+        for (int i = 0; i < packet_length - 1; i++) {
+        // need this delay or data read is not correct
+        while (not Serial.available()) {
+            delay(1);
+        }
+        command_buffer[i] = (byte)Serial.read();
+        // uncomment out to see each of the bytes following the command
+        //send_debug_info(i, command_buffer[i]);
+        }
+    }
+    command_entry.command_func();
+}
+
+
+void send_debug_info(byte id, int value) {
+    byte debug_buffer[5] = { (byte)4, (byte)DEBUG_PRINT, 0, 0, 0 };
+    debug_buffer[2] = id;
+    debug_buffer[3] = highByte(value);
+    debug_buffer[4] = lowByte(value);
+    Serial.write(debug_buffer, 5);
+}
+
+void serial_loopback() {
+    byte loop_back_buffer[3] = { 2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
+    Serial.write(loop_back_buffer, 3);
+}
+
+void set_pin_mode() {
+    byte pin;
+    byte mode;
+    pin = command_buffer[0];
+    mode = command_buffer[1];
+
+    switch (mode) {
+        case INPUT:
+            the_digital_pins[pin].pin_mode = mode;
+            the_digital_pins[pin].reporting_enabled = command_buffer[2];
+            pinMode(pin, INPUT);
+            break;
+        case INPUT_PULLUP:
+            the_digital_pins[pin].pin_mode = mode;
+            the_digital_pins[pin].reporting_enabled = command_buffer[2];
+            pinMode(pin, INPUT_PULLUP);
+            break;
+        case OUTPUT:
+            the_digital_pins[pin].pin_mode = mode;
+            pinMode(pin, OUTPUT);
+            break;
+        default:
+            break;
+    }
+}
+
+
+void digital_write() {
+    byte pin;
+    byte value;
+    pin = command_buffer[0];
+    value = command_buffer[1];
+    digitalWrite(pin, value);
+}
+
+void analog_write() {
+    // command_buffer[0] = PIN, command_buffer[1] = value_msb,
+    // command_buffer[2] = value_lsb
+    byte pin;  // command_buffer[0]
+    unsigned int value;
+
+    pin = command_buffer[0];
+
+    value = (command_buffer[1] << 8) + command_buffer[2];
+    analogWrite(pin, value);
+}
 
 void setup() {
-
+    Serial.begin(115200);
 }
 
 void loop() {
