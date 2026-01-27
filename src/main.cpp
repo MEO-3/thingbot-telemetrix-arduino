@@ -60,7 +60,14 @@ extern void analog_write();
 // 1 byte: 0: pin
 extern void analog_read();
 
+// Report types
+#define DIGITAL_REPORT DIGITAL_WRITE
+#define ANALOG_REPORT ANALOG_WRITE
+#define I_AM_HERE 6
 
+#define DEBUG_PRINT 99
+
+#define MAX_COMMAND_LENGTH 30
 struct command_descriptor {
     void (*command_func)();
 };
@@ -73,21 +80,6 @@ command_descriptor command_table[] = {
     { &analog_write },
     { &analog_read },
 };
-
-#define MAX_COMMAND_LENGTH 30
-#define DEBUG_PRINT 99
-
-#define MAX_DIGITAL_PINS_SUPPORTED 100
-#define MAX_ANALOG_PINS_SUPPORTED 16
-
-struct pin_descriptor {
-    byte pin_number;
-    byte pin_mode;
-    bool reporting_enabled;  // If true, then send reports if an input pin
-    int last_value;          // Last value read for input mode
-};
-
-pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 
 byte command_buffer[MAX_COMMAND_LENGTH];
 
@@ -132,6 +124,23 @@ void get_next_command() {
     command_entry.command_func();
 }
 
+#define MAX_DIGITAL_PINS_SUPPORTED 100
+#define MAX_ANALOG_PINS_SUPPORTED 16
+
+unsigned long current_millis;   // for analog input loop
+unsigned long previous_millis;  // for analog input loop
+uint8_t analog_sampling_interval = 19;
+
+struct pin_descriptor {
+    byte pin_number;
+    byte pin_mode;
+    bool reporting_enabled;  // If true, then send reports if an input pin
+    int last_value;          // Last value read for input mode
+    int differential;        // Differential value for analog pins
+};
+#define AT_MODE_NOT_SET 0xFF
+pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
+pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
 
 void send_debug_info(byte id, int value) {
     byte debug_buffer[5] = { (byte)4, (byte)DEBUG_PRINT, 0, 0, 0 };
@@ -193,10 +202,38 @@ void analog_write() {
     analogWrite(pin, value);
 }
 
+// initialize the pin data structures
+void init_pin_structures() {
+  for (byte i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
+    the_digital_pins[i].pin_number = i;
+    the_digital_pins[i].pin_mode = AT_MODE_NOT_SET;
+    the_digital_pins[i].reporting_enabled = false;
+    the_digital_pins[i].last_value = 0;
+  }
+
+  // establish the analog pin array
+  for (byte i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+    the_analog_pins[i].pin_number = i;
+    the_analog_pins[i].pin_mode = AT_MODE_NOT_SET;
+    the_analog_pins[i].reporting_enabled = false;
+    the_analog_pins[i].last_value = 0;
+    the_analog_pins[i].differential = 0;
+  }
+}
+
 void setup() {
+    init_pin_structures();
+
     Serial.begin(115200);
+    pinMode(13, OUTPUT);
+    for (int i = 0; i < 4; i++) {
+        digitalWrite(13, HIGH);
+        delay(250);
+        digitalWrite(13, LOW);
+        delay(250);
+    }
 }
 
 void loop() {
-
+    get_next_command();
 }
