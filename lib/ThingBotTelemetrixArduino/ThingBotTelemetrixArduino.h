@@ -1,0 +1,17 @@
+#ifndef THINGBOTTELEMETRIXARDUINO_H
+#define THINGBOTTELEMETRIXARDUINO_H
+
+#define COMMAND_BUFFER_SIZE 30
+
+// Command define
+#define DIGITAL_WRITE 1
+#define DIGITAL_READ 2
+#define ANALOG_WRITE 3
+#define ANALOG_READ 4
+
+class ThingBotTeletrixArduino {
+
+public:
+};
+
+#endif // THINGBOTTELEMETRIXARDUINO_H
