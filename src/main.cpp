@@ -8,7 +8,7 @@
 
 #define SPI_ENABLED 1
 #define I2C_ENABLED 1
-#define THINGBOT_EXTENDED 0
+#define THINGBOT_EXTENDED 1
 
 #ifdef I2C_ENABLED
 #include <Wire.h>
