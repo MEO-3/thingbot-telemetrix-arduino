@@ -6,6 +6,8 @@
 
 #include <Arduino.h>
 
+#define ARDUINO_ID 1
+
 #define SPI_ENABLED 1
 #define I2C_ENABLED 1
 #define THINGBOT_EXTENDED 1
@@ -29,6 +31,7 @@
 #define DIGITAL_READ 3
 #define ANALOG_WRITE 4
 #define ANALOG_READ 5
+#define ARE_YOU_THERE 6
 
 #define I2C_WRITE 6
 #define I2C_READ 7
@@ -60,6 +63,8 @@ extern void analog_write();
 // 1 byte: 0: pin
 extern void analog_read();
 
+extern void are_you_there();
+
 // Report types
 #define DIGITAL_REPORT DIGITAL_WRITE
 #define ANALOG_REPORT ANALOG_WRITE
@@ -73,12 +78,13 @@ struct command_descriptor {
 };
 
 command_descriptor command_table[] = {
-    { &serial_loopback },       // 0
-    { &set_pin_mode },          // 1...
-    { &digital_write },
-    { &digital_read },
-    { &analog_write },
-    { &analog_read },
+    &serial_loopback,       // 0
+    &set_pin_mode,          // 1...
+    &digital_write,
+    &digital_read,
+    &analog_write,
+    &analog_read,
+    &are_you_there           
 };
 
 byte command_buffer[MAX_COMMAND_LENGTH];
@@ -121,6 +127,7 @@ void get_next_command() {
         //send_debug_info(i, command_buffer[i]);
         }
     }
+    // call the command function
     command_entry.command_func();
 }
 
@@ -202,6 +209,20 @@ void analog_write() {
     analogWrite(pin, value);
 }
 
+void digital_read() {
+
+}
+
+void analog_read() {
+
+}
+
+void are_you_there() {
+    // send_debug_info(I_AM_HERE, ARDUINO_ID);
+    byte report_message[2] = {I_AM_HERE, ARDUINO_ID};
+    Serial.write(report_message, 2);
+}
+
 // initialize the pin data structures
 void init_pin_structures() {
   for (byte i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
@@ -222,16 +243,8 @@ void init_pin_structures() {
 }
 
 void setup() {
-    init_pin_structures();
-
     Serial.begin(115200);
-    pinMode(13, OUTPUT);
-    for (int i = 0; i < 4; i++) {
-        digitalWrite(13, HIGH);
-        delay(250);
-        digitalWrite(13, LOW);
-        delay(250);
-    }
+    init_pin_structures();
 }
 
 void loop() {
