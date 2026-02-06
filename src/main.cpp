@@ -203,11 +203,19 @@ void analog_write() {
 }
 
 void digital_read() {
-
+    byte pin;
+    byte value;
+    pin = command_buffer[0];
+    value = digitalRead(pin);
+    // send_debug_info(DIGITAL_REPORT, value);
 }
 
 void analog_read() {
-
+    byte pin;
+    int value;
+    pin = command_buffer[0];
+    value = analogRead(pin);
+    // send_debug_info(ANALOG_REPORT, value);
 }
 
 void are_you_there() {
