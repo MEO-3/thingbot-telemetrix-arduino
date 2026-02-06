@@ -48,19 +48,14 @@
 
 extern void serial_loopback();
 
-// 2 bytes: 0: pin, 1: mode
 extern void set_pin_mode();
 
-// 2 bytes: 0: pin, 1: value
 extern void digital_write();
 
-// 1 byte: 0: pin
 extern void digital_read();
 
-// 2 bytes: 0: pin, 1: value (0-255)
 extern void analog_write();
 
-// 1 byte: 0: pin
 extern void analog_read();
 
 extern void are_you_there();
