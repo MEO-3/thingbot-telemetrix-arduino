@@ -114,7 +114,7 @@ void get_next_command() {
     // get the command byte
     command = (byte)Serial.read();
 
-    send_debug_info(packet_length, command);
+    // send_debug_info(packet_length, command);
     command_entry = command_table[command];
 
     if (packet_length > 1) {
@@ -187,6 +187,7 @@ void digital_write() {
     pin = command_buffer[0];
     value = command_buffer[1];
     digitalWrite(pin, value);
+    // send_debug_info(DIGITAL_REPORT, value);
 }
 
 void analog_write() {
