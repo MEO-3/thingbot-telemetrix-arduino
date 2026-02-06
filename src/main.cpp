@@ -158,7 +158,7 @@ void send_debug_info(byte id, int value) {
 }
 
 void serial_loopback() {
-    byte loop_back_buffer[3] = { 2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
+    byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
     Serial.write(loop_back_buffer, 3);
 }
 
@@ -219,8 +219,8 @@ void analog_read() {
 
 void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
-    byte report_message[2] = {I_AM_HERE, ARDUINO_ID};
-    Serial.write(report_message, 2);
+    byte report_message[3] = {2, I_AM_HERE, ARDUINO_ID};
+    Serial.write(report_message, 3);
 }
 
 // initialize the pin data structures
