@@ -33,18 +33,18 @@
 #define ANALOG_READ 5
 #define ARE_YOU_THERE 6
 
-#define I2C_WRITE 6
-#define I2C_READ 7
-#define SPI_WRITE 8
-#define SPI_READ 9
+#define I2C_WRITE 7
+#define I2C_READ 8
+#define SPI_WRITE 9
+#define SPI_READ 10
 
-#define DC_WRITE 10
-#define DC_READ 11
-#define SERVO_WRITE 12
-#define SERVO_READ 13
+#define DC_WRITE 11
+#define DC_READ 12
+#define SERVO_WRITE 13
+#define SERVO_READ 14
 
-#define BUZZER_WRITE 14
-#define PWM_WRITE 15
+#define BUZZER_WRITE 15
+#define PWM_WRITE 16
 
 extern void serial_loopback();
 
@@ -79,7 +79,7 @@ command_descriptor command_table[] = {
     &digital_read,
     &analog_write,
     &analog_read,
-    &are_you_there           
+    &are_you_there
 };
 
 byte command_buffer[MAX_COMMAND_LENGTH];
@@ -114,7 +114,7 @@ void get_next_command() {
     // get the command byte
     command = (byte)Serial.read();
 
-    // send_debug_info(packet_length, command);
+    send_debug_info(packet_length, command);
     command_entry = command_table[command];
 
     if (packet_length > 1) {
