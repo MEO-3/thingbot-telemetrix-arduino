@@ -127,8 +127,18 @@ void get_next_command() {
         //send_debug_info(i, command_buffer[i]);
         }
     }
+
+    Serial.print("Received command: ");
+    Serial.print(command);
     // call the command function
-    command_entry.command_func();
+    // command_entry.command_func();
+    // switch(command) {
+    //     case ARE_YOU_THERE:
+    //         are_you_there();
+    //         break;
+    //     default:
+    //         break;
+    // }
 }
 
 #define MAX_DIGITAL_PINS_SUPPORTED 100
@@ -221,6 +231,7 @@ void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
     byte report_message[2] = {I_AM_HERE, ARDUINO_ID};
     Serial.write(report_message, 2);
+    Serial.print("Report I_AM_HERE sent\r\n");
 }
 
 // initialize the pin data structures
