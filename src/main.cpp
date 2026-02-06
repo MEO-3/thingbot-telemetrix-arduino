@@ -48,19 +48,14 @@
 
 extern void serial_loopback();
 
-// 2 bytes: 0: pin, 1: mode
 extern void set_pin_mode();
 
-// 2 bytes: 0: pin, 1: value
 extern void digital_write();
 
-// 1 byte: 0: pin
 extern void digital_read();
 
-// 2 bytes: 0: pin, 1: value (0-255)
 extern void analog_write();
 
-// 1 byte: 0: pin
 extern void analog_read();
 
 extern void are_you_there();
@@ -89,6 +84,14 @@ command_descriptor command_table[] = {
 
 byte command_buffer[MAX_COMMAND_LENGTH];
 
+void send_debug_info(byte id, int value) {
+    byte debug_buffer[5] = {(byte)4, (byte)DEBUG_PRINT, 0, 0, 0 };
+    debug_buffer[2] = id;
+    debug_buffer[3] = highByte(value);
+    debug_buffer[4] = lowByte(value);
+    Serial.write(debug_buffer, 5);
+}
+
 void get_next_command() {
     byte command;
     byte packet_length;
@@ -111,8 +114,7 @@ void get_next_command() {
     // get the command byte
     command = (byte)Serial.read();
 
-    // uncomment the next line to see the packet length and command
-    //send_debug_info(packet_length, command);
+    // send_debug_info(packet_length, command);
     command_entry = command_table[command];
 
     if (packet_length > 1) {
@@ -123,22 +125,11 @@ void get_next_command() {
             delay(1);
         }
         command_buffer[i] = (byte)Serial.read();
-        // uncomment out to see each of the bytes following the command
-        //send_debug_info(i, command_buffer[i]);
+        // send_debug_info(i, command_buffer[i]);
         }
     }
-
-    Serial.print("Received command: ");
-    Serial.print(command);
     // call the command function
-    // command_entry.command_func();
-    // switch(command) {
-    //     case ARE_YOU_THERE:
-    //         are_you_there();
-    //         break;
-    //     default:
-    //         break;
-    // }
+    command_entry.command_func();
 }
 
 #define MAX_DIGITAL_PINS_SUPPORTED 100
@@ -159,16 +150,8 @@ struct pin_descriptor {
 pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
 
-void send_debug_info(byte id, int value) {
-    byte debug_buffer[5] = { (byte)4, (byte)DEBUG_PRINT, 0, 0, 0 };
-    debug_buffer[2] = id;
-    debug_buffer[3] = highByte(value);
-    debug_buffer[4] = lowByte(value);
-    Serial.write(debug_buffer, 5);
-}
-
 void serial_loopback() {
-    byte loop_back_buffer[3] = { 2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
+    byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
     Serial.write(loop_back_buffer, 3);
 }
 
@@ -198,7 +181,6 @@ void set_pin_mode() {
     }
 }
 
-
 void digital_write() {
     byte pin;
     byte value;
@@ -220,18 +202,25 @@ void analog_write() {
 }
 
 void digital_read() {
-
+    byte pin;
+    byte value;
+    pin = command_buffer[0];
+    value = digitalRead(pin);
+    // send_debug_info(DIGITAL_REPORT, value);
 }
 
 void analog_read() {
-
+    byte pin;
+    int value;
+    pin = command_buffer[0];
+    value = analogRead(pin);
+    // send_debug_info(ANALOG_REPORT, value);
 }
 
 void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
-    byte report_message[2] = {I_AM_HERE, ARDUINO_ID};
-    Serial.write(report_message, 2);
-    Serial.print("Report I_AM_HERE sent\r\n");
+    byte report_message[3] = {2, I_AM_HERE, ARDUINO_ID};
+    Serial.write(report_message, 3);
 }
 
 // initialize the pin data structures
