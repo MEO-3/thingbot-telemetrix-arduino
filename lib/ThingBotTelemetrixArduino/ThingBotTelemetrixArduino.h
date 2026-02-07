@@ -1,8 +1,6 @@
 #ifndef THINGBOTTELEMETRIXARDUINO_H
 #define THINGBOTTELEMETRIXARDUINO_H
 
-#define DHT_PIN
-
 class ThingBotTeletrixArduino {
 
 public:

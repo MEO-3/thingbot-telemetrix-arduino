@@ -11,6 +11,7 @@
 
 #define SPI_ENABLED 1
 #define I2C_ENABLED 1
+#define DHT_ENABLED 1
 #define THINGBOT_EXTENDED 1
 
 #ifdef I2C_ENABLED
@@ -47,6 +48,11 @@
 #define BUZZER_WRITE 15
 #define PWM_WRITE 16
 
+// DHT config
+#define DHT_PIN_MODE 0x11
+#define DHT_TYPE_11 11
+#define DHT_TYPE_22 22
+
 extern void serial_loopback();
 
 extern void set_pin_mode();
@@ -65,6 +71,7 @@ extern void are_you_there();
 #define DIGITAL_REPORT DIGITAL_WRITE
 #define ANALOG_REPORT ANALOG_WRITE
 #define I_AM_HERE 6
+#define DHT_REPORT 11
 
 #define DEBUG_PRINT 99
 
@@ -139,6 +146,7 @@ void get_next_command() {
 unsigned long current_millis;   // for analog input loop
 unsigned long previous_millis;  // for analog input loop
 uint8_t analog_sampling_interval = 19;
+uint16_t dht_read_interval = 3000; // milliseconds for accurate DHT readings
 
 struct pin_descriptor {
     byte pin_number;
@@ -150,6 +158,12 @@ struct pin_descriptor {
 #define AT_MODE_NOT_SET 0xFF
 pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
+
+struct dht_sensor {
+    DHT* dht_instance;
+    byte dht_type;
+};
+dht_sensor dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
 
 void serial_loopback() {
     byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
@@ -176,6 +190,14 @@ void set_pin_mode() {
         case OUTPUT:
             the_digital_pins[pin].pin_mode = mode;
             pinMode(pin, OUTPUT);
+            break;
+        case DHT_PIN_MODE:
+            dht_sensors[pin].dht_type = command_buffer[2];
+            if (dht_sensors[pin].dht_type == DHT_TYPE_11) {
+                dht_sensors[pin].dht_instance = new DHT(pin, DHT11);
+            } else if (dht_sensors[pin].dht_type == DHT_TYPE_22) {
+                dht_sensors[pin].dht_instance = new DHT(pin, DHT22);
+            }
             break;
         default:
             break;
@@ -244,11 +266,107 @@ void init_pin_structures() {
   }
 }
 
+void scan_digital_inputs() {
+    byte value;
+    byte input_message[3] = {DIGITAL_REPORT, 0, 0};
+
+    for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
+        if (the_digital_pins[i].pin_mode == INPUT || the_digital_pins[i].pin_mode == INPUT_PULLUP) {
+            // send_debug_info(i, the_digital_pins[i].reporting_enabled);
+            if (the_digital_pins[i].reporting_enabled) {
+                // if the value changed since last read
+                value = (byte) digitalRead(the_digital_pins[i].pin_number);
+                // send_debug_info(i, value);
+                if (value != the_digital_pins[i].last_value) {
+                    the_digital_pins[i].last_value = value;
+                    input_message[1] = (byte) i;
+                    input_message[2] = value;
+                    // send_debug_info(3, value);
+
+                    Serial.write(input_message, 3);
+                }
+            }
+        }
+    }
+}
+
+void scan_analog_inputs() {
+    int value;
+    byte input_message[4] = {ANALOG_REPORT, 0, 0, 0};
+
+    // send_debug_info(99,99);
+    if (current_millis - previous_millis > analog_sampling_interval) {
+        previous_millis += analog_sampling_interval;
+
+        for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+            if (the_analog_pins[i].pin_mode == ANALOG) {
+                if (the_analog_pins[i].reporting_enabled) {
+                    // if the value changed since last read
+                    value = analogRead(the_analog_pins[i].pin_number);
+
+                    // send_debug_info(i, value);
+                    if (value != the_analog_pins[i].last_value) {
+                        // check to see if the trigger_threshold was achieved
+                        // trigger_value = abs(value - the_analog_pins[i].last_value);
+
+                        // if(trigger_value > the_analog_pins[i].trigger_threshold) {
+                        // trigger value achieved, send out the report
+                        the_analog_pins[i].last_value = value;
+                        // input_message[1] = the_analog_pins[i].pin_number;
+                        input_message[1] = (byte) i;
+                        input_message[2] = highByte(value); // get high order byte
+                        input_message[3] = lowByte(value);
+                        Serial.write(input_message, 4);
+                        delay(1);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void scan_dht_inputs() {
+    float h;
+    float t;
+    byte input_message[5] = {DHT_REPORT, 0, 0, 0, 0};
+
+    if (current_millis - previous_millis > dht_read_interval) {
+        previous_millis += dht_read_interval;
+        for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
+        if (the_digital_pins[i].pin_mode == DHT_REPORT) {
+            h = dht_sensors[i].dht_instance->readHumidity();
+            t = dht_sensors[i].dht_instance->readTemperature();
+
+            // send humidity
+            input_message[1] = (byte) i;
+            input_message[2] = 0; // humidity indicator
+            input_message[3] = highByte((int)(h * 100)); // send as integer * 100
+            input_message[4] = lowByte((int)(h * 100));
+            Serial.write(input_message, 5);
+            delay(1);
+
+            // send temperature
+            input_message[1] = (byte) i;
+            input_message[2] = 1; // temperature indicator
+            input_message[3] = highByte((int)(t * 100)); // send as integer * 100
+            input_message[4] = lowByte((int)(t * 100));
+            Serial.write(input_message, 5);
+            delay(1);
+        }
+    }
+    }
+    
+}
+
 void setup() {
     Serial.begin(115200);
     init_pin_structures();
 }
 
 void loop() {
+    current_millis = millis();
     get_next_command();
+    scan_digital_inputs();
+    scan_analog_inputs();
+    scan_dht_inputs();
 }
