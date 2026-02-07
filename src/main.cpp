@@ -26,6 +26,13 @@
 #include <Adafruit_PWMServoDriver.h>
 #endif
 
+#ifdef DHT_ENABLED
+// DHT config
+#define DHT_PIN_MODE 0x11
+#define DHT_TYPE_11 11
+#define DHT_TYPE_22 22
+#endif
+
 // Command index (matches command_table index)
 #define SERIAL_LOOP_BACK 0
 #define SET_PIN_MODE 1
@@ -47,11 +54,6 @@
 
 #define BUZZER_WRITE 15
 #define PWM_WRITE 16
-
-// DHT config
-#define DHT_PIN_MODE 0x11
-#define DHT_TYPE_11 11
-#define DHT_TYPE_22 22
 
 extern void serial_loopback();
 
@@ -122,7 +124,7 @@ void get_next_command() {
     // get the command byte
     command = (byte)Serial.read();
 
-    // send_debug_info(packet_length, command);
+    send_debug_info(packet_length, command);
     command_entry = command_table[command];
 
     if (packet_length > 1) {
@@ -144,7 +146,8 @@ void get_next_command() {
 #define MAX_ANALOG_PINS_SUPPORTED 16
 
 unsigned long current_millis;   // for analog input loop
-unsigned long previous_millis;  // for analog input loop
+unsigned long analog_previous_millis = 0;  // for analog input loop
+unsigned long dht_previous_millis = 0;  // for DHT read loop
 uint8_t analog_sampling_interval = 19;
 uint16_t dht_read_interval = 3000; // milliseconds for accurate DHT readings
 
@@ -198,6 +201,8 @@ void set_pin_mode() {
             } else if (dht_sensors[pin].dht_type == DHT_TYPE_22) {
                 dht_sensors[pin].dht_instance = new DHT(pin, DHT22);
             }
+            dht_sensors[pin].dht_instance->begin();
+            the_digital_pins[pin].pin_mode = DHT_REPORT;
             break;
         default:
             break;
@@ -268,7 +273,7 @@ void init_pin_structures() {
 
 void scan_digital_inputs() {
     byte value;
-    byte input_message[3] = {DIGITAL_REPORT, 0, 0};
+    byte input_message[4] = {3, DIGITAL_REPORT, 0, 0};
 
     for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
         if (the_digital_pins[i].pin_mode == INPUT || the_digital_pins[i].pin_mode == INPUT_PULLUP) {
@@ -283,7 +288,7 @@ void scan_digital_inputs() {
                     input_message[2] = value;
                     // send_debug_info(3, value);
 
-                    Serial.write(input_message, 3);
+                    Serial.write(input_message, 4);
                 }
             }
         }
@@ -292,11 +297,11 @@ void scan_digital_inputs() {
 
 void scan_analog_inputs() {
     int value;
-    byte input_message[4] = {ANALOG_REPORT, 0, 0, 0};
+    byte input_message[5] = {4, ANALOG_REPORT, 0, 0, 0};
 
     // send_debug_info(99,99);
-    if (current_millis - previous_millis > analog_sampling_interval) {
-        previous_millis += analog_sampling_interval;
+    if (current_millis - analog_previous_millis > analog_sampling_interval) {
+        analog_previous_millis += analog_sampling_interval;
 
         for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
             if (the_analog_pins[i].pin_mode == ANALOG) {
@@ -316,7 +321,7 @@ void scan_analog_inputs() {
                         input_message[1] = (byte) i;
                         input_message[2] = highByte(value); // get high order byte
                         input_message[3] = lowByte(value);
-                        Serial.write(input_message, 4);
+                        Serial.write(input_message, 5);
                         delay(1);
                     }
                 }
@@ -328,32 +333,29 @@ void scan_analog_inputs() {
 void scan_dht_inputs() {
     float h;
     float t;
-    byte input_message[5] = {DHT_REPORT, 0, 0, 0, 0};
+    byte input_message[7] = {6, DHT_REPORT, 0, 0, 0, 0, 0};
 
-    if (current_millis - previous_millis > dht_read_interval) {
-        previous_millis += dht_read_interval;
+    if (current_millis - dht_previous_millis > dht_read_interval) {
+        dht_previous_millis += dht_read_interval;
         for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
-        if (the_digital_pins[i].pin_mode == DHT_REPORT) {
-            h = dht_sensors[i].dht_instance->readHumidity();
-            t = dht_sensors[i].dht_instance->readTemperature();
+            if (the_digital_pins[i].pin_mode == DHT_REPORT) {
+                h = dht_sensors[i].dht_instance->readHumidity();
+                t = dht_sensors[i].dht_instance->readTemperature();
+                
+                input_message[2] = (byte) i; // pin number
 
-            // send humidity
-            input_message[1] = (byte) i;
-            input_message[2] = 0; // humidity indicator
-            input_message[3] = highByte((int)(h * 100)); // send as integer * 100
-            input_message[4] = lowByte((int)(h * 100));
-            Serial.write(input_message, 5);
-            delay(1);
+                // send humidity
+                input_message[3] = highByte((int)(h * 100)); // send as integer * 100
+                input_message[4] = lowByte((int)(h * 100));
 
-            // send temperature
-            input_message[1] = (byte) i;
-            input_message[2] = 1; // temperature indicator
-            input_message[3] = highByte((int)(t * 100)); // send as integer * 100
-            input_message[4] = lowByte((int)(t * 100));
-            Serial.write(input_message, 5);
-            delay(1);
+                // send temperature
+                input_message[5] = highByte((int)(t * 100)); // send as integer * 100
+                input_message[6] = lowByte((int)(t * 100));
+                Serial.write(input_message, 7);
+                // send_debug_info(DHT_REPORT, (int)(t * 100));
+                // send_debug_info(DHT_REPORT, (int)(h * 100));
+            }
         }
-    }
     }
     
 }
