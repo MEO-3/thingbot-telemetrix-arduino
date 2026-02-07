@@ -124,7 +124,7 @@ void get_next_command() {
     // get the command byte
     command = (byte)Serial.read();
 
-    send_debug_info(packet_length, command);
+    // send_debug_info(packet_length, command);
     command_entry = command_table[command];
 
     if (packet_length > 1) {
