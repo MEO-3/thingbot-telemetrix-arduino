@@ -299,7 +299,6 @@ void scan_analog_inputs() {
     int value;
     byte input_message[5] = {4, ANALOG_REPORT, 0, 0, 0};
 
-    // send_debug_info(99,99);
     if (current_millis - analog_previous_millis > analog_sampling_interval) {
         analog_previous_millis += analog_sampling_interval;
 
