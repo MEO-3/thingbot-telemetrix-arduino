@@ -5,6 +5,7 @@
 */
 
 #include <Arduino.h>
+#include <DHT.h>
 
 #define ARDUINO_ID 1
 
