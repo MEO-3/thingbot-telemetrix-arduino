@@ -22,15 +22,26 @@
 #include <SPI.h>
 #endif
 
-#ifdef THINGBOT_EXTENDED
-#include <Adafruit_PWMServoDriver.h>
-#endif
-
 #ifdef DHT_ENABLED
 // DHT config
 #define DHT_PIN_MODE 0x11
 #define DHT_TYPE_11 11
 #define DHT_TYPE_22 22
+#endif
+
+#ifdef THINGBOT_EXTENDED
+#include <Adafruit_PWMServoDriver.h>
+
+#define M1 1
+#define M2 2
+#define M3 3
+#define M4 4
+
+#define S1 1
+#define S2 2
+#define S3 3
+#define S4 4
+#define S5 5
 #endif
 
 // Command index (matches command_table index)
@@ -42,18 +53,10 @@
 #define ANALOG_READ 5
 #define ARE_YOU_THERE 6
 
-#define I2C_WRITE 7
-#define I2C_READ 8
-#define SPI_WRITE 9
-#define SPI_READ 10
-
-#define DC_WRITE 11
-#define DC_READ 12
-#define SERVO_WRITE 13
-#define SERVO_READ 14
-
-#define BUZZER_WRITE 15
-#define PWM_WRITE 16
+#define DC_WRITE 7
+#define SERVO_WRITE 8
+#define BUZZER_WRITE 9
+#define LED_WRITE 10
 
 extern void serial_loopback();
 
@@ -68,6 +71,21 @@ extern void analog_write();
 extern void analog_read();
 
 extern void are_you_there();
+
+#ifdef THINGBOT_EXTENDED
+extern void control_dc();
+
+extern void control_servo();
+
+extern void control_buzzer();
+
+extern void control_led();
+
+// PWM helper functions
+extern uint16_t map_speed_to_pwm(int value);
+extern uint16_t map_angle_to_pwm(int angle);
+extern void setup_pwm_driver();
+#endif
 
 // Report types
 #define DIGITAL_REPORT DIGITAL_WRITE
@@ -89,7 +107,13 @@ command_descriptor command_table[] = {
     &digital_read,
     &analog_write,
     &analog_read,
-    &are_you_there
+    &are_you_there,
+    #ifdef THINGBOT_EXTENDED
+    &control_dc,
+    &control_servo,
+    &control_buzzer,
+    &control_led
+    #endif
 };
 
 byte command_buffer[MAX_COMMAND_LENGTH];
@@ -274,6 +298,129 @@ void analog_read() {
     // send_debug_info(ANALOG_REPORT, value);
 }
 
+#ifdef THINGBOT_EXTENDED
+void setup_pwm_driver() {
+    pwm.begin();
+    pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
+    delay(10);
+}
+
+void control_dc() {
+    byte motor;
+    byte speed;
+    motor = command_buffer[0];
+    speed = command_buffer[1];
+    // send_debug_info(DC_WRITE, speed);
+    switch (motor) {
+        case M1:
+            if (speed >= 0) {
+                pwm.setPWM(M1_A, 0, map_speed_to_pwm(speed));
+                pwm.setPWM(M1_B, 0, 0);
+            } else {
+                pwm.setPWM(M1_A, 0, 0);
+                pwm.setPWM(M1_B, 0, map_speed_to_pwm(-speed));
+            }
+            break;
+        case M2:
+            if (speed >= 0) {
+                pwm.setPWM(M2_A, 0, map_speed_to_pwm(speed));
+                pwm.setPWM(M2_B, 0, 0);
+            } else {
+                pwm.setPWM(M2_A, 0, 0);
+                pwm.setPWM(M2_B, 0, map_speed_to_pwm(-speed));
+            }
+            break;
+        case M3:
+            if (speed >= 0) {
+                pwm.setPWM(M3_A, 0, map_speed_to_pwm(speed));
+                pwm.setPWM(M3_B, 0, 0);
+            } else {
+                pwm.setPWM(M3_A, 0, 0);
+                pwm.setPWM(M3_B, 0, map_speed_to_pwm(-speed));
+            }
+            break;
+        case M4:
+            if (speed >= 0) {
+                pwm.setPWM(M4_A, 0, map_speed_to_pwm(speed));
+                pwm.setPWM(M4_B, 0, 0);
+            } else {
+                pwm.setPWM(M4_A, 0, 0);
+                pwm.setPWM(M4_B, 0, map_speed_to_pwm(-speed));
+            }
+            break;
+    }
+}
+
+void control_servo() {
+    byte servo;
+    byte angle;
+    servo = command_buffer[0];
+    angle = command_buffer[1];
+    // send_debug_info(SERVO_WRITE, angle);
+    switch (servo) {
+        case S1:
+            pwm.setPWM(SERVO_1, 0, map_angle_to_pwm(angle));
+            break;
+        case S2:
+            pwm.setPWM(SERVO_2, 0, map_angle_to_pwm(angle));
+            break;
+        case S3:
+            pwm.setPWM(SERVO_3, 0, map_angle_to_pwm(angle));
+            break;
+        case S4:
+            pwm.setPWM(SERVO_4, 0, map_angle_to_pwm(angle));
+            break;
+        case S5:
+            pwm.setPWM(SERVO_5, 0, map_angle_to_pwm(angle));
+            break;
+    }
+}
+
+void control_buzzer() {
+    byte frequency;
+    frequency = command_buffer[0];
+    // send_debug_info(BUZZER_WRITE, frequency);
+    if (frequency == 0) {
+        pwm.setPWM(BUZZER, 0, 0);
+    } else {
+        pwm.setPWM(BUZZER, 0, map_speed_to_pwm(frequency));
+    }
+}
+
+void control_led() {
+    byte led;
+    byte state;
+    led = command_buffer[0];
+    state = command_buffer[1];
+    // send_debug_info(LED_WRITE, state);
+    switch (led) {
+        case 1:
+            if (state) {
+                pwm.setPWM(LED_1, 0, map_speed_to_pwm(100));
+            } else {
+                pwm.setPWM(LED_1, 0, 0);
+            }
+            break;
+        case 2:
+            if (state) {
+                pwm.setPWM(LED_2, 0, map_speed_to_pwm(100));
+            } else {
+                pwm.setPWM(LED_2, 0, 0);
+            }
+            break;
+    }
+}
+
+uint16_t map_speed_to_pwm(int value) {
+    return (uint16_t)map(value, 0, 100, 0, 4095);
+}
+
+uint16_t map_angle_to_pwm(int angle) {
+    return (uint16_t)map(angle, 0, 180, 150, 600);
+}
+
+#endif
+
 void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
     byte report_message[3] = {2, I_AM_HERE, ARDUINO_ID};
@@ -390,6 +537,9 @@ void scan_dht_inputs() {
 void setup() {
     Serial.begin(115200);
     init_pin_structures();
+    #ifdef THINGBOT_EXTENDED
+    setup_pwm_driver();
+    #endif
 }
 
 void loop() {
