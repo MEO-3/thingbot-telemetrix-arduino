@@ -162,11 +162,39 @@ struct pin_descriptor {
 pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
 
+// DHT sensor structure
 struct dht_sensor {
     DHT* dht_instance;
     byte dht_type;
 };
 dht_sensor dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
+
+// PCA9685 PWM Servo Driver
+#ifdef THINGBOT_EXTENDED
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+
+// Pin definitions
+#define M1_A 2
+#define M1_B 3
+#define M2_A 4
+#define M2_B 5
+#define M3_A 7
+#define M3_B 8
+#define M4_A 1
+#define M4_B 0
+
+#define SERVO_1 12
+#define SERVO_2 11
+#define SERVO_3 10
+#define SERVO_4 9
+#define SERVO_5 8
+
+#define BUZZER 14
+#define LED_1 15
+#define LED_2 13
+
+#define SW 3 // ESP32 C3 GPIO
+#endif
 
 void serial_loopback() {
     byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
