@@ -1,7 +1,7 @@
 #ifndef THINGBOTTELEMETRIXARDUINO_H
 #define THINGBOTTELEMETRIXARDUINO_H
 
-class ThingBotTeletrixArduino {
+class ThingBotTelemetrixArduino {
 
 public:
 };
