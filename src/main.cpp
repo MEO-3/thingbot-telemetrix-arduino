@@ -92,6 +92,7 @@ extern void setup_pwm_driver();
 #define ANALOG_REPORT ANALOG_WRITE
 #define I_AM_HERE 6
 #define DHT_REPORT 11
+#define THINGBOT_SW_REPORT 12
 
 #define DEBUG_PRINT 99
 
@@ -305,6 +306,12 @@ void setup_pwm_driver() {
     delay(10);
 }
 
+void setup_sw_input() {
+    pinMode(SW, INPUT_PULLUP);
+    the_digital_pins[SW].pin_mode = INPUT_PULLUP;
+    the_digital_pins[SW].reporting_enabled = true;
+}
+
 void control_dc() {
     byte motor;
     byte speed;
@@ -451,6 +458,21 @@ void scan_digital_inputs() {
     byte input_message[4] = {3, DIGITAL_REPORT, 0, 0};
 
     for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
+        #ifdef THINGBOT_EXTENDED
+        if (i == SW) {
+            // handle switch input separately
+            value = (byte) digitalRead(SW);
+            if (value != the_digital_pins[SW].last_value) {
+                the_digital_pins[SW].last_value = value;
+                input_message[1] = (byte) THINGBOT_SW_REPORT;
+                input_message[2] = (byte) SW;
+                input_message[3] = value;
+                Serial.write(input_message, 4);
+            }
+            continue;
+        }
+        #endif
+
         if (the_digital_pins[i].pin_mode == INPUT || the_digital_pins[i].pin_mode == INPUT_PULLUP) {
             // send_debug_info(i, the_digital_pins[i].reporting_enabled);
             if (the_digital_pins[i].reporting_enabled) {
@@ -459,8 +481,9 @@ void scan_digital_inputs() {
                 // send_debug_info(i, value);
                 if (value != the_digital_pins[i].last_value) {
                     the_digital_pins[i].last_value = value;
-                    input_message[1] = (byte) i;
-                    input_message[2] = value;
+                    input_message[1] = DIGITAL_REPORT;
+                    input_message[2] = (byte) i;
+                    input_message[3] = value;
                     // send_debug_info(3, value);
 
                     Serial.write(input_message, 4);
@@ -492,9 +515,9 @@ void scan_analog_inputs() {
                         // trigger value achieved, send out the report
                         the_analog_pins[i].last_value = value;
                         // input_message[1] = the_analog_pins[i].pin_number;
-                        input_message[1] = (byte) i;
-                        input_message[2] = highByte(value); // get high order byte
-                        input_message[3] = lowByte(value);
+                        input_message[2] = (byte) i;
+                        input_message[3] = highByte(value); // get high order byte
+                        input_message[4] = lowByte(value);
                         Serial.write(input_message, 5);
                         delay(1);
                     }
@@ -539,6 +562,7 @@ void setup() {
     init_pin_structures();
     #ifdef THINGBOT_EXTENDED
     setup_pwm_driver();
+    setup_sw_input();
     #endif
 }
 
