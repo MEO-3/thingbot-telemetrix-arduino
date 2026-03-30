@@ -12,6 +12,7 @@
 #define SPI_ENABLED 1
 #define I2C_ENABLED 1
 #define DHT_ENABLED 1
+#define ULTRASONIC_ENABLED 1
 #define THINGBOT_EXTENDED 1
 
 #ifdef I2C_ENABLED
@@ -27,6 +28,11 @@
 #define DHT_PIN_MODE 0x11
 #define DHT_TYPE_11 11
 #define DHT_TYPE_22 22
+#endif
+
+#ifdef ULTRASONIC_ENABLED
+#include "Ultrasonic.h"
+#define ULTRASONIC_PIN_MODE 0x12
 #endif
 
 #ifdef THINGBOT_EXTENDED
@@ -72,6 +78,8 @@ extern void analog_read();
 
 extern void are_you_there();
 
+extern void ultrasonic_read();
+
 #ifdef THINGBOT_EXTENDED
 extern void control_dc();
 
@@ -93,6 +101,7 @@ extern void setup_pwm_driver();
 #define I_AM_HERE 6
 #define DHT_REPORT 11
 #define THINGBOT_SW_REPORT 12
+#define ULTRASONIC_REPORT 13
 
 #define DEBUG_PRINT 99
 
@@ -167,8 +176,8 @@ void get_next_command() {
     command_entry.command_func();
 }
 
-#define MAX_DIGITAL_PINS_SUPPORTED 100
-#define MAX_ANALOG_PINS_SUPPORTED 16
+#define MAX_DIGITAL_PINS_SUPPORTED 32
+#define MAX_ANALOG_PINS_SUPPORTED 32
 
 unsigned long current_millis;   // for analog input loop
 unsigned long analog_previous_millis = 0;  // for analog input loop
@@ -193,6 +202,12 @@ struct dht_sensor {
     byte dht_type;
 };
 dht_sensor dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
+
+// Ultrasonic sensor structure
+struct ultrasonic_sensor {
+    Ultrasonic* ultrasonic_instance;
+};
+ultrasonic_sensor ultrasonic_sensors[MAX_DIGITAL_PINS_SUPPORTED];
 
 // PCA9685 PWM Servo Driver
 #ifdef THINGBOT_EXTENDED
@@ -257,6 +272,12 @@ void set_pin_mode() {
             dht_sensors[pin].dht_instance->begin();
             the_digital_pins[pin].pin_mode = DHT_REPORT;
             break;
+        case ULTRASONIC_PIN_MODE:
+            // for ultrasonic sensors, command_buffer[2] = outPin (trigger pin)
+            // create a new Ultrasonic instance and store it in the analog pin structure
+            ultrasonic_sensors[pin].ultrasonic_instance = new Ultrasonic(command_buffer[2], pin);
+            the_analog_pins[pin].pin_mode = ULTRASONIC_REPORT;
+            break;
         default:
             break;
     }
@@ -297,6 +318,19 @@ void analog_read() {
     pin = command_buffer[0];
     value = analogRead(pin);
     // send_debug_info(ANALOG_REPORT, value);
+}
+
+void ultrasonic_read() {
+    for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+        if (the_analog_pins[i].pin_mode == ULTRASONIC_REPORT) {
+            long distance = ultrasonic_sensors[i].ultrasonic_instance->readDistance();
+            byte echo_pin = ultrasonic_sensors[i].ultrasonic_instance->getEchoPin();
+            byte trigger_pin = ultrasonic_sensors[i].ultrasonic_instance->getTriggerPin();
+            byte report_message[6] = {6, ULTRASONIC_REPORT, echo_pin, trigger_pin, highByte(distance), lowByte(distance)};
+            Serial.write(report_message, 6);
+            // send_debug_info(ULTRASONIC_REPORT, distance);
+        }
+    }
 }
 
 #ifdef THINGBOT_EXTENDED
@@ -554,7 +588,6 @@ void scan_dht_inputs() {
             }
         }
     }
-    
 }
 
 void setup() {
