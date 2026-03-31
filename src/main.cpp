@@ -50,7 +50,7 @@
 #define S5 5
 #endif
 
-// Command index (matches command_table index)
+// Command IDs
 #define SERIAL_LOOP_BACK 0
 #define SET_PIN_MODE 1
 #define DIGITAL_WRITE 2
@@ -108,25 +108,36 @@ extern void setup_pwm_driver();
 
 #define MAX_COMMAND_LENGTH 30
 struct command_descriptor {
+    byte command_id;
     void (*command_func)();
 };
 
 command_descriptor command_table[] = {
-    &serial_loopback,       // 0
-    &set_pin_mode,          // 1...
-    &digital_write,
-    &digital_read,
-    &analog_write,
-    &analog_read,
-    &are_you_there,
-    &read_ultrasonic,
+    {SERIAL_LOOP_BACK, &serial_loopback},
+    {SET_PIN_MODE, &set_pin_mode},
+    {DIGITAL_WRITE, &digital_write},
+    {DIGITAL_READ, &digital_read},
+    {ANALOG_WRITE, &analog_write},
+    {ANALOG_READ, &analog_read},
+    {ARE_YOU_THERE, &are_you_there},
+    {READ_ULTRASONIC, &read_ultrasonic},
     #ifdef THINGBOT_EXTENDED
-    &control_dc,
-    &control_servo,
-    &control_buzzer,
-    &control_led
+    {DC_WRITE, &control_dc},
+    {SERVO_WRITE, &control_servo},
+    {BUZZER_WRITE, &control_buzzer},
+    {LED_WRITE, &control_led}
     #endif
 };
+
+void (*lookup_command(byte command))() {
+    size_t command_count = sizeof(command_table) / sizeof(command_table[0]);
+    for (size_t i = 0; i < command_count; i++) {
+        if (command_table[i].command_id == command) {
+            return command_table[i].command_func;
+        }
+    }
+    return nullptr;
+}
 
 byte command_buffer[MAX_COMMAND_LENGTH];
 
@@ -141,7 +152,7 @@ void send_debug_info(byte id, int value) {
 void get_next_command() {
     byte command;
     byte packet_length;
-    command_descriptor command_entry;
+    void (*command_func)();
 
     // clear the command buffer
     memset(command_buffer, 0, sizeof(command_buffer));
@@ -161,7 +172,10 @@ void get_next_command() {
     command = (byte)Serial.read();
 
     // send_debug_info(packet_length, command);
-    command_entry = command_table[command];
+    command_func = lookup_command(command);
+    if (command_func == nullptr) {
+        return;
+    }
 
     if (packet_length > 1) {
         // get the data for that command
@@ -175,7 +189,7 @@ void get_next_command() {
         }
     }
     // call the command function
-    command_entry.command_func();
+    command_func();
 }
 
 #define MAX_DIGITAL_PINS_SUPPORTED 32
