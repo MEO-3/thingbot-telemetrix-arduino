@@ -58,11 +58,12 @@
 #define ANALOG_WRITE 4
 #define ANALOG_READ 5
 #define ARE_YOU_THERE 6
+#define READ_ULTRASONIC 7
 
-#define DC_WRITE 7
-#define SERVO_WRITE 8
-#define BUZZER_WRITE 9
-#define LED_WRITE 10
+#define DC_WRITE 101
+#define SERVO_WRITE 102
+#define BUZZER_WRITE 103
+#define LED_WRITE 104
 
 extern void serial_loopback();
 
@@ -78,7 +79,7 @@ extern void analog_read();
 
 extern void are_you_there();
 
-extern void ultrasonic_read();
+extern void read_ultrasonic();
 
 #ifdef THINGBOT_EXTENDED
 extern void control_dc();
@@ -99,9 +100,9 @@ extern void setup_pwm_driver();
 #define DIGITAL_REPORT DIGITAL_WRITE
 #define ANALOG_REPORT ANALOG_WRITE
 #define I_AM_HERE 6
+#define ULTRASONIC_REPORT READ_ULTRASONIC
 #define DHT_REPORT 11
-#define THINGBOT_SW_REPORT 12
-#define ULTRASONIC_REPORT 13
+#define THINGBOT_SW_REPORT 102
 
 #define DEBUG_PRINT 99
 
@@ -118,6 +119,7 @@ command_descriptor command_table[] = {
     &analog_write,
     &analog_read,
     &are_you_there,
+    &read_ultrasonic,
     #ifdef THINGBOT_EXTENDED
     &control_dc,
     &control_servo,
@@ -320,7 +322,7 @@ void analog_read() {
     // send_debug_info(ANALOG_REPORT, value);
 }
 
-void ultrasonic_read() {
+void read_ultrasonic() {
     for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
         if (the_analog_pins[i].pin_mode == ULTRASONIC_REPORT) {
             long distance = ultrasonic_sensors[i].ultrasonic_instance->readDistance();
