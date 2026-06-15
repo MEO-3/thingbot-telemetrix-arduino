@@ -3,7 +3,7 @@
 
 void serial_loopback() {
     byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
-    Serial.write(loop_back_buffer, 3);
+    transport->write(loop_back_buffer, 3);
 }
 
 void set_pin_mode() {
@@ -92,7 +92,7 @@ void read_ultrasonic() {
             byte echo_pin = ultrasonic_sensors[i].ultrasonic_instance->getEchoPin();
             byte trigger_pin = ultrasonic_sensors[i].ultrasonic_instance->getTriggerPin();
             byte report_message[6] = {6, ULTRASONIC_REPORT, echo_pin, trigger_pin, highByte(distance), lowByte(distance)};
-            Serial.write(report_message, 6);
+            transport->write(report_message, 6);
             // send_debug_info(ULTRASONIC_REPORT, distance);
         }
     }
@@ -101,5 +101,5 @@ void read_ultrasonic() {
 void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
     byte report_message[3] = {2, I_AM_HERE, ARDUINO_ID};
-    Serial.write(report_message, 3);
+    transport->write(report_message, 3);
 }

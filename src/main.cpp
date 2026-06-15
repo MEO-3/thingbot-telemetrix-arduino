@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include "ThingBotTelemetrixArduino.h"
+#include "transport/SerialTransport.h"
 #include "handlers.h"
 #include "scan.h"
 
@@ -23,6 +24,9 @@ pin_descriptor    the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 pin_descriptor    the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
 dht_sensor        dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
 ultrasonic_sensor ultrasonic_sensors[MAX_DIGITAL_PINS_SUPPORTED];
+
+// Active transport — extern-declared in transport.h
+Transport* transport = nullptr;
 
 command_descriptor command_table[] = {
     {SERIAL_LOOP_BACK, &serial_loopback},
@@ -56,7 +60,7 @@ void send_debug_info(byte id, int value) {
     debug_buffer[2] = id;
     debug_buffer[3] = highByte(value);
     debug_buffer[4] = lowByte(value);
-    Serial.write(debug_buffer, 5);
+    transport->write(debug_buffer, 5);
 }
 
 void get_next_command() {
@@ -64,22 +68,26 @@ void get_next_command() {
     byte packet_length;
     void (*command_func)();
 
+    if (!transport->connected()) {
+        return;
+    }
+
     // clear the command buffer
     memset(command_buffer, 0, sizeof(command_buffer));
 
     // if there is no command waiting, then return
-    if (!Serial.available()) {
+    if (!transport->available()) {
         return;
     }
     // get the packet length
-    packet_length = (byte)Serial.read();
+    packet_length = (byte)transport->read();
 
-    while (!Serial.available()) {
+    while (!transport->available()) {
         delay(1);
     }
 
     // get the command byte
-    command = (byte)Serial.read();
+    command = (byte)transport->read();
 
     // send_debug_info(packet_length, command);
     command_func = lookup_command(command);
@@ -91,10 +99,10 @@ void get_next_command() {
         // get the data for that command
         for (int i = 0; i < packet_length - 1; i++) {
         // need this delay or data read is not correct
-        while (not Serial.available()) {
+        while (!transport->available()) {
             delay(1);
         }
-        command_buffer[i] = (byte)Serial.read();
+        command_buffer[i] = (byte)transport->read();
         // send_debug_info(i, command_buffer[i]);
         }
     }
@@ -103,7 +111,10 @@ void get_next_command() {
 }
 
 void setup() {
-    Serial.begin(115200);
+    static SerialTransport<decltype(Serial)> serialTransport(Serial, 115200);
+    serialTransport.begin();
+    transport = &serialTransport;
+
     init_pin_structures();
 #ifdef THINGBOT_EXTENDED
     setup_pwm_driver();

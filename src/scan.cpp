@@ -41,7 +41,7 @@ void scan_digital_inputs() {
                 input_message[1] = (byte) THINGBOT_SW_REPORT;
                 input_message[2] = (byte) SW;
                 input_message[3] = value;
-                Serial.write(input_message, 4);
+                transport->write(input_message, 4);
             }
             continue;
         }
@@ -60,7 +60,7 @@ void scan_digital_inputs() {
                     input_message[3] = value;
                     // send_debug_info(3, value);
 
-                    Serial.write(input_message, 4);
+                    transport->write(input_message, 4);
                 }
             }
         }
@@ -92,7 +92,7 @@ void scan_analog_inputs() {
                         input_message[2] = (byte) i;
                         input_message[3] = highByte(value); // get high order byte
                         input_message[4] = lowByte(value);
-                        Serial.write(input_message, 5);
+                        transport->write(input_message, 5);
                         delay(1);
                     }
                 }
@@ -122,7 +122,7 @@ void scan_dht_inputs() {
                 // send temperature
                 input_message[5] = highByte((int)(t * 100)); // send as integer * 100
                 input_message[6] = lowByte((int)(t * 100));
-                Serial.write(input_message, 7);
+                transport->write(input_message, 7);
                 // send_debug_info(DHT_REPORT, (int)(t * 100));
                 // send_debug_info(DHT_REPORT, (int)(h * 100));
             }
