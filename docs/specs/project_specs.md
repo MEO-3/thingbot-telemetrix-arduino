@@ -15,14 +15,28 @@ Hardware/Platform
 - Libraries: DHT (Adafruit), Adafruit PWM Servo Driver (PCA9685), Adafruit Unified Sensor, and a local Ultrasonic driver.
 
 Project Structure
-- `src/main.cpp`: Core firmware, protocol handling, device scan loops, and extended ThingBot controls.
-- `lib/Ultrasonic`: Minimal driver for trigger/echo ultrasonic sensors.
-- `lib/ThingBotTelemetrixArduino`: Placeholder library stub (no implementation yet).
-- `platformio.ini`: PlatformIO configuration, board, libs, and build flags.
+
+src/
+- main.cpp: Shared state definitions, command table, dispatch (lookup_command, get_next_command), setup(), loop().
+- handlers.h / handlers.cpp: All 8 generic command handler implementations (serial loopback, pin mode, digital/analog read/write, ultrasonic, are-you-there).
+- scan.h / scan.cpp: Pin structure initialization and the three scan loops (digital, analog, DHT); owns all timing variables.
+
+lib/ThingBotTelemetrixArduino/
+- core/config.h: Feature flags (THINGBOT_EXTENDED, DHT_ENABLED, etc.) and ARDUINO_ID.
+- core/protocol.h: Command/report ID definitions, DEBUG_REPORT, MAX_COMMAND_LENGTH, command_descriptor struct.
+- core/pin_state.h: pin_descriptor, dht_sensor, ultrasonic_sensor structs; extern declarations for all shared state arrays.
+- core/transport.h: Reserved for future transport-layer abstractions.
+- ThingBotExtended.h: All ThingBot extended defines — motor/servo identifiers (M1-M4, S1-S5), PCA9685 channel assignments, extended command IDs (101-104), function declarations.
+- ThingBotExtended.cpp: Implementations of control_dc, control_servo, control_buzzer, control_led, map helpers, setup_pwm_driver, setup_sw_input. Owns the Adafruit_PWMServoDriver instance.
+
+lib/Ultrasonic/
+- Minimal trigger/echo ultrasonic driver. Instances are created per-pin at runtime via SET_PIN_MODE.
+
+platformio.ini: PlatformIO environment, board, lib_deps, and USB CDC build flags.
 
 Serial Protocol
 - Packet format: first byte is packet length (number of bytes following), second byte is command ID, remaining bytes are arguments.
-- Commands are dispatched via a command table indexed by command ID.
+- Commands are dispatched via a command table in main.cpp, indexed by command ID.
 - Responses use the same leading-length format.
 
 Command IDs
@@ -45,6 +59,7 @@ Report IDs
 - 6: I_AM_HERE (response to ARE_YOU_THERE)
 - 7: ULTRASONIC_REPORT
 - 11: DHT_REPORT
+- 99: DEBUG_REPORT (debug utility, not part of normal protocol)
 - 102: THINGBOT_SW_REPORT (board switch state change)
 
 Supported Features
@@ -58,29 +73,34 @@ Supported Features
   - DHT11/DHT22 setup via SET_PIN_MODE.
   - Periodic read and report (default interval 3000 ms).
 - Ultrasonic Sensors
-  - Custom driver using trigger/echo; READ_ULTRASONIC scans configured sensors and reports distance in cm.
-- ThingBot Extended (PCA9685)
-  - DC motors M1-M4 with direction control.
-  - Servos S1-S5 with angle to PWM mapping.
-  - Buzzer frequency mapped to PWM.
-  - LEDs with on/off control.
-  - Board switch input (SW) reports state changes.
+  - Custom driver using trigger/echo; READ_ULTRASONIC scans all configured sensors and reports distance.
+- ThingBot Extended (PCA9685) — enabled via THINGBOT_EXTENDED in core/config.h
+  - DC motors M1-M4 with direction control via paired PCA9685 channels.
+  - Servos S1-S5 with angle-to-PWM mapping (0-180° → pulse 150-600).
+  - Buzzer frequency mapped to PWM duty cycle.
+  - LEDs (LED_1, LED_2) with on/off control.
+  - Board switch input (SW, GPIO 3) reports state changes as THINGBOT_SW_REPORT.
 
 Runtime Flow
-- `setup()` initializes Serial, pin structures, and PWM driver (if enabled).
-- `loop()` continually:
-  - Reads and dispatches incoming commands.
-  - Scans digital inputs for changes.
-  - Samples analog inputs and reports changed values.
-  - Reads DHT sensors on interval.
+- setup() initializes Serial, pin structures, and (if THINGBOT_EXTENDED) the PCA9685 driver and board switch.
+- loop() continually:
+  - Captures current_millis = millis() once per iteration.
+  - Reads and dispatches one pending serial command.
+  - Scans digital inputs for changed values and emits reports.
+  - Samples analog inputs on a 19 ms interval and emits reports on change.
+  - Reads DHT sensors on a 3000 ms interval and emits temperature/humidity reports.
+
+Feature Toggle
+- Set THINGBOT_EXTENDED to 0 (or comment it out) in core/config.h to build base Telemetrix-compatible firmware with no PCA9685 dependency.
 
 Build/Upload
-- PlatformIO environment: `env:esp32-c3-devkitm-1`.
+- PlatformIO environment: env:esp32-c3-devkitm-1.
 - Build flags enable USB CDC for serial communication on boot.
+- See docs/build_release.md for producing a merged flashable binary.
 
 Licensing
-- AGPL-3.0 (see `LICENSE`).
+- AGPL-3.0 (see LICENSE).
 
 Notable Gaps / TODOs
-- `lib/ThingBotTelemetrixArduino` is a stub with no functionality.
-- DIGITAL_READ and ANALOG_READ currently do not emit responses in the implementation (only read values locally).
+- DIGITAL_READ and ANALOG_READ do not emit response packets (values are read locally but not reported).
+- core/transport.h is reserved and currently empty.
