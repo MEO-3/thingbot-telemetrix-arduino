@@ -5,15 +5,7 @@
 */
 
 #include <Arduino.h>
-#include <DHT.h>
-
-#define ARDUINO_ID 1
-
-#define SPI_ENABLED 1
-#define I2C_ENABLED 1
-#define DHT_ENABLED 1
-#define ULTRASONIC_ENABLED 1
-#define THINGBOT_EXTENDED 1
+#include "ThingBotTelemetrixArduino.h"
 
 #ifdef I2C_ENABLED
 #include <Wire.h>
@@ -23,110 +15,38 @@
 #include <SPI.h>
 #endif
 
-#ifdef DHT_ENABLED
-// DHT config
-#define DHT_PIN_MODE 0x11
-#define DHT_TYPE_11 11
-#define DHT_TYPE_22 22
-#endif
+// Shared state — extern-declared in pin_state.h
+byte             command_buffer[MAX_COMMAND_LENGTH];
+pin_descriptor   the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
+pin_descriptor   the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
+dht_sensor       dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
+ultrasonic_sensor ultrasonic_sensors[MAX_DIGITAL_PINS_SUPPORTED];
 
-#ifdef ULTRASONIC_ENABLED
-#include "Ultrasonic.h"
-#define ULTRASONIC_PIN_MODE 0x12
-#endif
-
-#ifdef THINGBOT_EXTENDED
-#include <Adafruit_PWMServoDriver.h>
-
-#define M1 1
-#define M2 2
-#define M3 3
-#define M4 4
-
-#define S1 1
-#define S2 2
-#define S3 3
-#define S4 4
-#define S5 5
-#endif
-
-// Command IDs
-#define SERIAL_LOOP_BACK 0
-#define SET_PIN_MODE 1
-#define DIGITAL_WRITE 2
-#define DIGITAL_READ 3
-#define ANALOG_WRITE 4
-#define ANALOG_READ 5
-#define ARE_YOU_THERE 6
-#define READ_ULTRASONIC 7
-
-#define DC_WRITE 101
-#define SERVO_WRITE 102
-#define BUZZER_WRITE 103
-#define LED_WRITE 104
-
-extern void serial_loopback();
-
-extern void set_pin_mode();
-
-extern void digital_write();
-
-extern void digital_read();
-
-extern void analog_write();
-
-extern void analog_read();
-
-extern void are_you_there();
-
-extern void read_ultrasonic();
-
-#ifdef THINGBOT_EXTENDED
-extern void control_dc();
-
-extern void control_servo();
-
-extern void control_buzzer();
-
-extern void control_led();
-
-// PWM helper functions
-extern uint16_t map_speed_to_pwm(int value);
-extern uint16_t map_angle_to_pwm(int angle);
-extern void setup_pwm_driver();
-#endif
-
-// Report types
-#define DIGITAL_REPORT DIGITAL_WRITE
-#define ANALOG_REPORT ANALOG_WRITE
-#define I_AM_HERE 6
-#define ULTRASONIC_REPORT READ_ULTRASONIC
-#define DHT_REPORT 11
-#define THINGBOT_SW_REPORT 102
-
-#define DEBUG_PRINT 99
-
-#define MAX_COMMAND_LENGTH 30
-struct command_descriptor {
-    byte command_id;
-    void (*command_func)();
-};
+// Forward declarations for generic command handlers
+void serial_loopback();
+void set_pin_mode();
+void digital_write();
+void digital_read();
+void analog_write();
+void analog_read();
+void are_you_there();
+void read_ultrasonic();
 
 command_descriptor command_table[] = {
     {SERIAL_LOOP_BACK, &serial_loopback},
-    {SET_PIN_MODE, &set_pin_mode},
-    {DIGITAL_WRITE, &digital_write},
-    {DIGITAL_READ, &digital_read},
-    {ANALOG_WRITE, &analog_write},
-    {ANALOG_READ, &analog_read},
-    {ARE_YOU_THERE, &are_you_there},
-    {READ_ULTRASONIC, &read_ultrasonic},
-    #ifdef THINGBOT_EXTENDED
-    {DC_WRITE, &control_dc},
-    {SERVO_WRITE, &control_servo},
-    {BUZZER_WRITE, &control_buzzer},
-    {LED_WRITE, &control_led}
-    #endif
+    {SET_PIN_MODE,     &set_pin_mode},
+    {DIGITAL_WRITE,    &digital_write},
+    {DIGITAL_READ,     &digital_read},
+    {ANALOG_WRITE,     &analog_write},
+    {ANALOG_READ,      &analog_read},
+    {ARE_YOU_THERE,    &are_you_there},
+    {READ_ULTRASONIC,  &read_ultrasonic},
+#ifdef THINGBOT_EXTENDED
+    {DC_WRITE,         &control_dc},
+    {SERVO_WRITE,      &control_servo},
+    {BUZZER_WRITE,     &control_buzzer},
+    {LED_WRITE,        &control_led},
+#endif
 };
 
 void (*lookup_command(byte command))() {
@@ -139,10 +59,8 @@ void (*lookup_command(byte command))() {
     return nullptr;
 }
 
-byte command_buffer[MAX_COMMAND_LENGTH];
-
 void send_debug_info(byte id, int value) {
-    byte debug_buffer[5] = {(byte)4, (byte)DEBUG_PRINT, 0, 0, 0 };
+    byte debug_buffer[5] = {(byte)4, (byte)DEBUG_REPORT, 0, 0, 0 };
     debug_buffer[2] = id;
     debug_buffer[3] = highByte(value);
     debug_buffer[4] = lowByte(value);
@@ -192,65 +110,11 @@ void get_next_command() {
     command_func();
 }
 
-#define MAX_DIGITAL_PINS_SUPPORTED 32
-#define MAX_ANALOG_PINS_SUPPORTED 32
-
-unsigned long current_millis;   // for analog input loop
-unsigned long analog_previous_millis = 0;  // for analog input loop
-unsigned long dht_previous_millis = 0;  // for DHT read loop
-uint8_t analog_sampling_interval = 19;
+unsigned long current_millis;
+unsigned long analog_previous_millis = 0;
+unsigned long dht_previous_millis = 0;
+uint8_t  analog_sampling_interval = 19;
 uint16_t dht_read_interval = 3000; // milliseconds for accurate DHT readings
-
-struct pin_descriptor {
-    byte pin_number;
-    byte pin_mode;
-    bool reporting_enabled;  // If true, then send reports if an input pin
-    int last_value;          // Last value read for input mode
-    int differential;        // Differential value for analog pins
-};
-#define AT_MODE_NOT_SET 0xFF
-pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
-pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
-
-// DHT sensor structure
-struct dht_sensor {
-    DHT* dht_instance;
-    byte dht_type;
-};
-dht_sensor dht_sensors[MAX_DIGITAL_PINS_SUPPORTED];
-
-// Ultrasonic sensor structure
-struct ultrasonic_sensor {
-    Ultrasonic* ultrasonic_instance;
-};
-ultrasonic_sensor ultrasonic_sensors[MAX_DIGITAL_PINS_SUPPORTED];
-
-// PCA9685 PWM Servo Driver
-#ifdef THINGBOT_EXTENDED
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-
-// Pin definitions
-#define M1_A 2
-#define M1_B 3
-#define M2_A 4
-#define M2_B 5
-#define M3_A 7
-#define M3_B 8
-#define M4_A 1
-#define M4_B 0
-
-#define SERVO_1 12
-#define SERVO_2 11
-#define SERVO_3 10
-#define SERVO_4 9
-#define SERVO_5 8
-
-#define BUZZER 14
-#define LED_1 15
-#define LED_2 13
-
-#define SW 3 // ESP32 C3 GPIO
-#endif
 
 void serial_loopback() {
     byte loop_back_buffer[3] = {2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
@@ -348,135 +212,6 @@ void read_ultrasonic() {
         }
     }
 }
-
-#ifdef THINGBOT_EXTENDED
-void setup_pwm_driver() {
-    pwm.begin();
-    pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
-    delay(10);
-}
-
-void setup_sw_input() {
-    pinMode(SW, INPUT_PULLUP);
-    the_digital_pins[SW].pin_mode = INPUT_PULLUP;
-    the_digital_pins[SW].reporting_enabled = true;
-}
-
-void control_dc() {
-    byte motor;
-    byte speed;
-    motor = command_buffer[0];
-    speed = command_buffer[1];
-    // send_debug_info(DC_WRITE, speed);
-    switch (motor) {
-        case M1:
-            if (speed >= 0) {
-                pwm.setPWM(M1_A, 0, map_speed_to_pwm(speed));
-                pwm.setPWM(M1_B, 0, 0);
-            } else {
-                pwm.setPWM(M1_A, 0, 0);
-                pwm.setPWM(M1_B, 0, map_speed_to_pwm(-speed));
-            }
-            break;
-        case M2:
-            if (speed >= 0) {
-                pwm.setPWM(M2_A, 0, map_speed_to_pwm(speed));
-                pwm.setPWM(M2_B, 0, 0);
-            } else {
-                pwm.setPWM(M2_A, 0, 0);
-                pwm.setPWM(M2_B, 0, map_speed_to_pwm(-speed));
-            }
-            break;
-        case M3:
-            if (speed >= 0) {
-                pwm.setPWM(M3_A, 0, map_speed_to_pwm(speed));
-                pwm.setPWM(M3_B, 0, 0);
-            } else {
-                pwm.setPWM(M3_A, 0, 0);
-                pwm.setPWM(M3_B, 0, map_speed_to_pwm(-speed));
-            }
-            break;
-        case M4:
-            if (speed >= 0) {
-                pwm.setPWM(M4_A, 0, map_speed_to_pwm(speed));
-                pwm.setPWM(M4_B, 0, 0);
-            } else {
-                pwm.setPWM(M4_A, 0, 0);
-                pwm.setPWM(M4_B, 0, map_speed_to_pwm(-speed));
-            }
-            break;
-    }
-}
-
-void control_servo() {
-    byte servo;
-    byte angle;
-    servo = command_buffer[0];
-    angle = command_buffer[1];
-    // send_debug_info(SERVO_WRITE, angle);
-    switch (servo) {
-        case S1:
-            pwm.setPWM(SERVO_1, 0, map_angle_to_pwm(angle));
-            break;
-        case S2:
-            pwm.setPWM(SERVO_2, 0, map_angle_to_pwm(angle));
-            break;
-        case S3:
-            pwm.setPWM(SERVO_3, 0, map_angle_to_pwm(angle));
-            break;
-        case S4:
-            pwm.setPWM(SERVO_4, 0, map_angle_to_pwm(angle));
-            break;
-        case S5:
-            pwm.setPWM(SERVO_5, 0, map_angle_to_pwm(angle));
-            break;
-    }
-}
-
-void control_buzzer() {
-    byte frequency;
-    frequency = command_buffer[0];
-    // send_debug_info(BUZZER_WRITE, frequency);
-    if (frequency == 0) {
-        pwm.setPWM(BUZZER, 0, 0);
-    } else {
-        pwm.setPWM(BUZZER, 0, map_speed_to_pwm(frequency));
-    }
-}
-
-void control_led() {
-    byte led;
-    byte state;
-    led = command_buffer[0];
-    state = command_buffer[1];
-    // send_debug_info(LED_WRITE, state);
-    switch (led) {
-        case 1:
-            if (state) {
-                pwm.setPWM(LED_1, 0, map_speed_to_pwm(100));
-            } else {
-                pwm.setPWM(LED_1, 0, 0);
-            }
-            break;
-        case 2:
-            if (state) {
-                pwm.setPWM(LED_2, 0, map_speed_to_pwm(100));
-            } else {
-                pwm.setPWM(LED_2, 0, 0);
-            }
-            break;
-    }
-}
-
-uint16_t map_speed_to_pwm(int value) {
-    return (uint16_t)map(value, 0, 100, 0, 4095);
-}
-
-uint16_t map_angle_to_pwm(int angle) {
-    return (uint16_t)map(angle, 0, 180, 150, 600);
-}
-
-#endif
 
 void are_you_there() {
     // send_debug_info(I_AM_HERE, ARDUINO_ID);
@@ -588,7 +323,7 @@ void scan_dht_inputs() {
             if (the_digital_pins[i].pin_mode == DHT_REPORT) {
                 h = dht_sensors[i].dht_instance->readHumidity();
                 t = dht_sensors[i].dht_instance->readTemperature();
-                
+
                 input_message[2] = (byte) i; // pin number
 
                 // send humidity
@@ -609,10 +344,10 @@ void scan_dht_inputs() {
 void setup() {
     Serial.begin(115200);
     init_pin_structures();
-    #ifdef THINGBOT_EXTENDED
+#ifdef THINGBOT_EXTENDED
     setup_pwm_driver();
     setup_sw_input();
-    #endif
+#endif
 }
 
 void loop() {

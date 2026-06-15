@@ -1,9 +1,7 @@
-#ifndef THINGBOTTELEMETRIXARDUINO_H
-#define THINGBOTTELEMETRIXARDUINO_H
-
-class ThingBotTelemetrixArduino {
-
-public:
-};
-
-#endif // THINGBOTTELEMETRIXARDUINO_H
+#pragma once
+#include "config.h"
+#include "protocol.h"
+#include "pin_state.h"
+#ifdef THINGBOT_EXTENDED
+#include "ThingBotExtended.h"
+#endif
