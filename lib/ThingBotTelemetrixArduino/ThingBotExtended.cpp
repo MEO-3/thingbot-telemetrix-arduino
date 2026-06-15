@@ -1,8 +1,8 @@
-#include "config.h"
+#include "core/config.h"
 #ifdef THINGBOT_EXTENDED
 
 #include "ThingBotExtended.h"
-#include "pin_state.h"
+#include "core/pin_state.h"
 #include <Adafruit_PWMServoDriver.h>
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
