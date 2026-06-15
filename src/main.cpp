@@ -6,7 +6,6 @@
 
 #include <Arduino.h>
 #include "ThingBotTelemetrixArduino.h"
-#include "transport/SerialTransport.h"
 #include "handlers.h"
 #include "scan.h"
 
