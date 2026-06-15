@@ -110,9 +110,18 @@ void get_next_command() {
 }
 
 void setup() {
+    pinMode(ONBOARD_LED_PIN, OUTPUT);
+#ifdef BLE_TRANSPORT
+    static BLETransport bleTransport(BLE_DEVICE_NAME);
+    bleTransport.begin();
+    transport = &bleTransport;
+    digitalWrite(ONBOARD_LED_PIN, LOW);   // active-LOW: LOW = on
+#else
     static SerialTransport<decltype(Serial)> serialTransport(Serial, 115200);
     serialTransport.begin();
     transport = &serialTransport;
+    digitalWrite(ONBOARD_LED_PIN, HIGH);  // active-LOW: HIGH = off
+#endif
 
     init_pin_structures();
 #ifdef THINGBOT_EXTENDED
