@@ -18,4 +18,8 @@ pio pkg exec --package tool-esptoolpy -- esptool.py --chip esp32c3 merge_bin -o 
   0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
   0x10000 .pio/build/esp32-c3-devkitm-1-ble/firmware.bin
 
-echo "Done"
+echo "Move binaries to dist folder"
+mkdir -p dist # Create dist folder if it doesn't exist
+
+mv full_firmware.bin dist/full_firmware.bin
+mv full_firmware_ble.bin dist/full_firmware_ble.bin
