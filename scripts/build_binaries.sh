@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 echo "Build Serial Firmware version"
 pio run -e esp32-c3-devkitm-1
