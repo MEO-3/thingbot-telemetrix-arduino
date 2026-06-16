@@ -2,6 +2,8 @@
 
 #ifdef BLE_TRANSPORT
 
+#include "esp_mac.h"
+
 BLETransport::BLETransport(const char *deviceName)
     : _deviceName(deviceName),
       _server(nullptr),
@@ -16,7 +18,14 @@ void BLETransport::begin()
     Serial.begin(115200);
     Serial.println("[BLE] init start");
 
-    NimBLEDevice::init(_deviceName);
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BT);
+    char macStr[13];
+    snprintf(macStr, sizeof(macStr), "%02x%02x%02x%02x%02x%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    _fullName = std::string(_deviceName) + "-" + macStr;
+
+    NimBLEDevice::init(_fullName.c_str());
     Serial.println("[BLE] device init done");
 
     _server = NimBLEDevice::createServer();

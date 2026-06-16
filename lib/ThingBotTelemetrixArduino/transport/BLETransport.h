@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <string>
 #include "core/transport.h"
 
 #define SERVICE_UUID "aa700001-8f6a-4e2c-b369-4060e0bb33aa"
@@ -35,6 +36,7 @@ public:
 
 private:
     const char *_deviceName;
+    std::string _fullName;
     NimBLEServer *_server;
     NimBLECharacteristic *_txChar;
     volatile bool _connected;
