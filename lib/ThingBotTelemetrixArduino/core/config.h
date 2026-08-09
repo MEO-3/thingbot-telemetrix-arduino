@@ -11,7 +11,6 @@
 // BLE transport settings — BLE_TRANSPORT / TRANSPORT_SWITCHABLE set via build flags
 #define BLE_DEVICE_NAME   "ThingBot"
 
-// Boot button transport switching (ESP32-C3 DevKitM-1)
-#define BOOT_BUTTON_PIN   9      // BOOT button, active LOW
-#define BOOT_HOLD_MS      2000   // hold duration to trigger transport switch
-#define ONBOARD_LED_PIN   8      // built-in blue LED (active HIGH)
+// GPIO 8 (SDA) and GPIO 9 (SCL) are the ESP32-C3 I2C bus: the PCA9685 at 0x40 and the OLED at
+// 0x3c live there. Never drive either as a plain GPIO — doing so before Wire claims the pins
+// leaves the bus stalled and every PCA9685 output (motors, servos, buzzer, LEDs) stays dead.
