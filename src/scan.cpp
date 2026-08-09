@@ -113,6 +113,12 @@ void scan_dht_inputs() {
                 h = dht_sensors[i].dht_instance->readHumidity();
                 t = dht_sensors[i].dht_instance->readTemperature();
 
+                // A failed read yields NAN, and casting NAN to int is undefined behaviour — the
+                // first read after begin() always fails, so skip instead of reporting garbage.
+                if (isnan(h) || isnan(t)) {
+                    continue;
+                }
+
                 input_message[2] = (byte) i; // pin number
 
                 // send humidity
