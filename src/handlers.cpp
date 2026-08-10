@@ -12,6 +12,12 @@ void set_pin_mode() {
     pin = command_buffer[0];
     mode = command_buffer[1];
 
+    // The pin index arrives over the wire as a full byte, so a malformed or hostile packet can
+    // carry 255 while every pin table holds 32 entries. Reject it before it indexes past the end.
+    if (pin >= MAX_DIGITAL_PINS_SUPPORTED || pin >= MAX_ANALOG_PINS_SUPPORTED) {
+        return;
+    }
+
     switch (mode) {
         case INPUT:
             the_digital_pins[pin].pin_mode = mode;
@@ -28,11 +34,18 @@ void set_pin_mode() {
             pinMode(pin, OUTPUT);
             break;
         case DHT_PIN_MODE:
+            // A host may reconfigure the same pin repeatedly; drop the previous instance so each
+            // reconfiguration does not strand its allocation.
+            delete dht_sensors[pin].dht_instance;
+            dht_sensors[pin].dht_instance = nullptr;
             dht_sensors[pin].dht_type = command_buffer[2];
             if (dht_sensors[pin].dht_type == DHT_TYPE_11) {
                 dht_sensors[pin].dht_instance = new DHT(pin, DHT11);
             } else if (dht_sensors[pin].dht_type == DHT_TYPE_22) {
                 dht_sensors[pin].dht_instance = new DHT(pin, DHT22);
+            } else {
+                // Unknown sensor type: leave the pin unconfigured rather than dereferencing null.
+                return;
             }
             dht_sensors[pin].dht_instance->begin();
             the_digital_pins[pin].pin_mode = DHT_REPORT;
@@ -40,6 +53,7 @@ void set_pin_mode() {
         case ULTRASONIC_PIN_MODE:
             // for ultrasonic sensors, command_buffer[2] = outPin (trigger pin)
             // create a new Ultrasonic instance and store it in the analog pin structure
+            delete ultrasonic_sensors[pin].ultrasonic_instance;
             ultrasonic_sensors[pin].ultrasonic_instance = new Ultrasonic(command_buffer[2], pin);
             the_analog_pins[pin].pin_mode = ULTRASONIC_REPORT;
             break;
