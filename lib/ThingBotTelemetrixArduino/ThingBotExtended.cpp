@@ -8,6 +8,11 @@
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 uint16_t map_speed_to_pwm(int value) {
+    // Arduino's map() does not clamp. A speed byte that arrives out of range -- 196, say,
+    // which is two's complement for -60 read as unsigned -- yields 8026, far past the
+    // PCA9685's 12-bit duty register, and the resulting duty is undefined. Clamp first.
+    if (value < 0) value = 0;
+    if (value > 100) value = 100;
     return (uint16_t)map(value, 0, 100, 0, 4095);
 }
 
@@ -29,9 +34,12 @@ void setup_sw_input() {
 
 void control_dc() {
     byte motor;
-    byte speed;
+    // The speed byte is a two's-complement signed value in -100..100. Reading it as an
+    // unsigned `byte` makes `if (speed >= 0)` always true, so every reverse branch below is
+    // dead code and the firmware can never drive backwards, whatever the client sends.
+    int8_t speed;
     motor = command_buffer[0];
-    speed = command_buffer[1];
+    speed = (int8_t)command_buffer[1];
     // send_debug_info(DC_WRITE, speed);
     switch (motor) {
         case M1:
