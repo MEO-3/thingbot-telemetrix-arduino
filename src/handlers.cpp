@@ -108,7 +108,7 @@ void read_ultrasonic() {
             long distance = ultrasonic_sensors[i].ultrasonic_instance->readDistance();
             byte echo_pin = ultrasonic_sensors[i].ultrasonic_instance->getEchoPin();
             byte trigger_pin = ultrasonic_sensors[i].ultrasonic_instance->getTriggerPin();
-            byte report_message[6] = {6, ULTRASONIC_REPORT, echo_pin, trigger_pin, highByte(distance), lowByte(distance)};
+            byte report_message[6] = {5, ULTRASONIC_REPORT, echo_pin, trigger_pin, highByte(distance), lowByte(distance)};
             transport->write(report_message, 6);
             // send_debug_info(ULTRASONIC_REPORT, distance);
         }
