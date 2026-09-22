@@ -51,10 +51,13 @@ void set_pin_mode() {
             the_digital_pins[pin].pin_mode = DHT_REPORT;
             break;
         case ULTRASONIC_PIN_MODE:
-            // for ultrasonic sensors, command_buffer[2] = outPin (trigger pin)
-            // create a new Ultrasonic instance and store it in the analog pin structure
+            // Ultrasonic's constructor is (triggerPin, echoPin), and a client sends
+            // [triggerPin, ULTRASONIC_PIN_MODE, echoPin] -- so `pin` is the trigger and
+            // command_buffer[2] is the echo. Passing them the other way round configured
+            // the sensor inside out: the trigger line was driven as an input and the echo
+            // line as an output.
             delete ultrasonic_sensors[pin].ultrasonic_instance;
-            ultrasonic_sensors[pin].ultrasonic_instance = new Ultrasonic(command_buffer[2], pin);
+            ultrasonic_sensors[pin].ultrasonic_instance = new Ultrasonic(pin, command_buffer[2]);
             the_analog_pins[pin].pin_mode = ULTRASONIC_REPORT;
             break;
         default:
